@@ -1,0 +1,35 @@
+- name: Проверка доступности MySQL
+  community.mysql.mysql_info:
+    login_port: "{{ mysql_master_port }}"
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+  register: mysql_check
+  retries: 10
+  delay: 3
+  until: mysql_check is succeeded
+
+- name: Создать дамп базы данных и сохранить на хосте
+  community.mysql.mysql_db:
+    state: dump
+    name:
+      - all
+    target: "{{ project_dir }}/wordpress_dump.sql"
+    login_host: "127.0.0.1"
+    login_port: "{{ mysql_master_port }}"
+    login_user: "{{ mysql_root_login }}"
+    login_password: "{{ mysql_root_password }}"
+
+- name: Остановить и удалить оба контенйера
+  community.docker.docker_container:
+    name: "{{ item }}"
+    state: absent
+    force_kill: true
+    cleanup: true
+  loop:
+    - wordpress
+    - wordpress_db
+
+- name: Удалить том db_data
+  community.docker.docker_volume:
+    name: db_data
+    state: absent

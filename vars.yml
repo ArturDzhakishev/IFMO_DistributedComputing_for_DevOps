@@ -1,8 +1,15 @@
+is_wordpress: true
+wordpress_port: 80
+db_host: wordpress_db
 mysql_user: wp_user
 mysql_password: password
 mysql_root_login: root
 mysql_root_password: root
 mysql_database: wordpress
+
+
+db_master: mysql-master
+db_slave: mysql-slave
 
 project_dir: /home/{{ ansible_user }}/wordpress
 MASTER_USER: replica_user
@@ -14,5 +21,21 @@ mysql_master_port: 3306
 mysql_slave_host: 127.0.0.1
 mysql_slave_port: 3307
 
+grafana_port: 3000
 mysql_exporter_user: exporter
 mysql_exporter_password: password
+
+galera_nodes:
+  # - name: galera1
+  #   bootstrap: true
+  - name: galera2
+    bootstrap: false
+  - name: galera3
+    bootstrap: false
+  - name: galera4
+    bootstrap: false
+  - name: galera5
+    bootstrap: false
+
+mariadb_backup_user: backupuser
+mariadb_backup_password: backup

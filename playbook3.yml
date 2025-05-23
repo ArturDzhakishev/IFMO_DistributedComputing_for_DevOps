@@ -1,0 +1,13 @@
+---
+- name: Home work 3
+  hosts: webserver
+  become: true
+  vars_files:
+    - vars.yml
+  roles:
+    - role: monitoring
+  tasks:
+    - name: Display Configuration Variables
+      ansible.builtin.debug:
+        msg:
+          - 'monitoring_url: {{ hostvars["webserver"]["ansible_host"] }}:{{ grafana_port }}' # monitoring url including port

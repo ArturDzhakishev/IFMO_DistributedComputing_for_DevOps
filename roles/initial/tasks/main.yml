@@ -1,0 +1,75 @@
+- name: Display Configuration Variables
+  ansible.builtin.debug:
+    msg:
+      - "wordpress: {{ is_wordpress }}" # True or False
+      - "wordpress_port: {{ wordpress_port }}" # 80 or 8080 or whatewer
+      - "wordpress_db_name: {{ mysql_database }}" # WP database name
+      - "db_host: {{ db_host }}" # container name CHANGE
+      - "db_pass: {{ mysql_root_password }}" # root password
+
+- name: Установить необходимые пакеты
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+    state: present
+
+- name: Добавить официальный GPG-ключ Docker
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Добавить репозиторий Docker
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+
+- name: Установить Docker и Docker Compose
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose
+    state: present
+    update_cache: true
+
+- name: Добавить пользователя в группу docker
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true
+
+- name: Запустить и включить docker
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Установить зависимости для подключения к MySQL через Python
+  ansible.builtin.apt:
+    name:
+      - python3-pymysql
+    state: present
+
+- name: Установить mysql-client на хосте
+  ansible.builtin.apt:
+    name: mysql-client
+    state: present
+
+- name: Создать директорию проекта
+  ansible.builtin.file:
+    path: wordpress/
+    state: directory
+    mode: '0755'
+
+- name: Создать volume db_data
+  community.docker.docker_volume:
+    name: db_data
+
+- name: Создать сеть Docker
+  community.docker.docker_network:
+    name: wpnet
+    state: present

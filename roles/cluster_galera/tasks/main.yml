@@ -1,0 +1,115 @@
+- name: Создать тома для первого узла
+  community.docker.docker_volume:
+    name: galera1_data
+  # loop: "{{ galera_nodes }}"
+
+- name: Создать тома для  каждого узла
+  community.docker.docker_volume:
+    name: "{{ item.name }}_data"
+  loop: "{{ galera_nodes }}"
+
+# - name: Создать директорию Galera
+#   ansible.builtin.file:
+#     path: "galera/{{ item.name }}"
+#     state: directory
+#     mode: '0755'
+#   loop: "{{ galera_nodes }}"
+
+# - name: Скопировать конфигурацию Galera
+#   ansible.builtin.template:
+#     src: galera.cnf.j2
+#     dest: "galera/{{ item.name }}/galera.cnf"
+#     mode: '0755'
+#   loop: "{{ galera_nodes }}"
+
+- name: Создание и запуск main контейнера Galera
+  community.docker.docker_container:
+    name: galera1
+    hostname: galera1
+    image: bitnami/mariadb-galera:10.11
+    restart_policy: always
+    env:
+      MARIADB_ROOT_PASSWORD: "{{ mysql_root_password }}"
+      MARIADB_DATABASE: "{{ mysql_database }}"
+      MARIADB_USER: "{{ mysql_user }}"
+      MARIADB_PASSWORD: "{{ mysql_password }}"
+      MARIADB_GALERA_CLUSTER_NAME: galera_cluster
+      # MARIADB_GALERA_NODE_NAME: galera1
+      MARIADB_GALERA_CLUSTER_ADDRESS: "gcomm://"
+      MARIADB_GALERA_MARIABACKUP_USER: "{{ mariadb_backup_user }}"
+      MARIADB_GALERA_MARIABACKUP_PASSWORD: "{{ mariadb_backup_password }}"
+      MARIADB_GALERA_CLUSTER_BOOTSTRAP: "yes"
+      MARIADB_GALERA_FORCE_SAFETOBOOTSTRAP: "yes"
+    volumes:
+      - "galera1_data:/bitnami/mariadb"
+    networks:
+      - name: wpnet
+    healthcheck:
+      test: ['CMD', '/opt/bitnami/scripts/mariadb-galera/healthcheck.sh']
+      start_period: 60s
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+- name: Wait for galera1 to become healthy
+  community.docker.docker_container_info:
+    name: galera1
+  register: galera1_info
+  until: galera1_info.container.State.Health.Status == "healthy"
+  retries: 20
+  delay: 10
+
+- name: Создание и запуск контейнеров Galera
+  community.docker.docker_container:
+    name: "{{ item.name }}"
+    hostname: "{{ item.name }}"
+    image: bitnami/mariadb-galera:10.11
+    restart_policy: always
+    env:
+      MARIADB_ROOT_PASSWORD: "{{ mysql_root_password }}"
+      MARIADB_DATABASE: "{{ mysql_database }}"
+      MARIADB_USER: "{{ mysql_user }}"
+      MARIADB_PASSWORD: "{{ mysql_password }}"
+      MARIADB_GALERA_CLUSTER_NAME: galera_cluster
+      # MARIADB_GALERA_NODE_NAME: "{{ item.name }}"
+      MARIADB_GALERA_CLUSTER_ADDRESS: "gcomm://galera1,galera2,galera3,galera4,galera5"
+      # MARIADB_GALERA_CLUSTER_ADDRESS: "gcomm://galera1,{{ galera_nodes | map(attribute='name') | join(',') }}"
+      MARIADB_GALERA_MARIABACKUP_USER: "{{ mariadb_backup_user }}"
+      MARIADB_GALERA_MARIABACKUP_PASSWORD: "{{ mariadb_backup_password }}"
+    volumes:
+      - "{{ item.name }}_data:/var/lib/mysql"
+    networks:
+      - name: wpnet
+    healthcheck:
+      test: ['CMD', '/opt/bitnami/scripts/mariadb-galera/healthcheck.sh']
+      start_period: 60s
+      interval: 60s
+      timeout: 5s
+      retries: 3
+  loop: "{{ galera_nodes }}"
+
+- name: Wait for Galera containers to become healthy
+  community.docker.docker_container_info:
+    name: "{{ item.name }}"
+  register: container_info
+  until: container_info.container.State.Health.Status == "healthy"
+  retries: 20
+  delay: 10
+  loop: "{{ galera_nodes }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+
+- name: Проверить статус galera кластера
+  community.mysql.mysql_query:
+    # login_host: "{{ galera_nodes[0].name }}"
+    login_host: 172.18.0.2
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    query: "SHOW STATUS LIKE 'WSREP_%'"
+  register: galera_status
+  become: false
+
+- name: Вывести статус репликации
+  ansible.builtin.debug:
+    var: galera_status

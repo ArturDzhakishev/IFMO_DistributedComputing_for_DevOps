@@ -1,0 +1,19 @@
+---
+- name: Home work 2
+  hosts: webserver
+  become: true
+  vars_files:
+    - vars.yml
+  pre_tasks:
+    - name: Display Configuration Variables
+      ansible.builtin.debug:
+        msg:
+          - "wordpress: {{ is_wordpress }}" # True or False
+          - "wordpress_port: {{ wordpress_port }}" # 80 or 8080 or whatewer
+          - "wordpress_db_name: {{ mysql_database  }}" # WP database name
+          - "db_master: {{ db_master }}" # container name
+          - "db_replica: {{ db_slave }}" # container name
+          - "db_pass: {{ mysql_root_password }}" # root password for master and replica
+  roles:
+    - role: dump
+    - role: master_and_slave

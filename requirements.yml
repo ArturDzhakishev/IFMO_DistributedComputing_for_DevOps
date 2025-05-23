@@ -1,6 +1,3 @@
 collections:
-<<<<<<< HEAD
-=======
   - name: community.docker
->>>>>>> 0f65dfc (Add .gitignore, ansible-lint)
   - name: community.mysql
