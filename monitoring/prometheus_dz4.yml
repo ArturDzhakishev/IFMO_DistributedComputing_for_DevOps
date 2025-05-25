@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['node_exporter:9100']
+
+  - job_name: 'haproxy'
+    static_configs:
+      - targets: ['haproxy_exporter:9101']
+
+  - job_name: 'mysqld_exporter'
+    static_configs:
+      - targets:
+          - 'mysqld_exporter_galera1:9104'
+          - 'mysqld_exporter_galera2:9104'
+          - 'mysqld_exporter_galera3:9104'
+          - 'mysqld_exporter_galera4:9104'
+          - 'mysqld_exporter_galera5:9104'

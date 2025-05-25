@@ -26,8 +26,8 @@ mysql_exporter_user: exporter
 mysql_exporter_password: password
 
 galera_nodes:
-  # - name: galera1
-  #   bootstrap: true
+  - name: galera1
+    bootstrap: true
   - name: galera2
     bootstrap: false
   - name: galera3
@@ -39,3 +39,7 @@ galera_nodes:
 
 mariadb_backup_user: backupuser
 mariadb_backup_password: backup
+
+loadbalancer: haproxy
+haproxy_port: 3308
+haproxy_check: haproxy_check

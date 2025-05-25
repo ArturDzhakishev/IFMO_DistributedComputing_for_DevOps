@@ -1,0 +1,80 @@
+- name: Остановить и удалить контейнеры из прошлых ДЗ
+  community.docker.docker_container:
+    name: "{{ item }}"
+    state: absent
+    force_kill: true
+    cleanup: true
+  loop:
+    - prometheus
+    - mysqld_exporter_master
+    - mysqld_exporter_slave
+
+- name: Скопировать конфигурацию Prometheus
+  ansible.builtin.copy:
+    src: monitoring/prometheus_dz4.yml
+    dest: monitoring/prometheus.yml
+    mode: '0755'
+
+- name: Создать пользователя для кластера
+  community.mysql.mysql_user:
+    name: "{{ mysql_exporter_user }}"
+    password: "{{ mysql_exporter_password }}"
+    priv: "*.*:PROCESS,REPLICATION CLIENT,SELECT"
+    host: "%"
+    login_user: "{{ mysql_root_login }}"
+    login_password: "{{ mysql_root_password }}"
+    login_host: 127.0.0.1
+    login_port: 3308
+    column_case_sensitive: false
+    state: present
+
+- name: Запустить контейнер Prometheus
+  community.docker.docker_container:
+    name: prometheus
+    image: prom/prometheus:latest
+    restart_policy: always
+    volumes:
+      - "./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml"
+    published_ports:
+      - "9090:9090"
+    networks:
+      - name: wpnet
+
+- name: Запустить haproxy_exporter
+  community.docker.docker_container:
+    name: haproxy_exporter
+    image: prom/haproxy-exporter
+    command:
+      - "--haproxy.scrape-uri=http://haproxy:8404/stats?stats;csv"
+    ports:
+      - "9101:9101"
+    networks:
+      - name: wpnet
+
+- name: Запустить 5 контейнеров mysqld_exporter для galera
+  community.docker.docker_container:
+    name: "mysqld_exporter_galera{{ item }}"
+    image: prom/mysqld-exporter
+    command:
+      - '--config.my-cnf=/cfg/.my.cnf'
+      - '--mysqld.address=galera{{ item }}:3306'
+    restart_policy: always
+    state: started
+    published_ports:
+      - "{{ 9110 + item | int }}:9104"
+    volumes:
+      - "./monitoring/my.cnf:/cfg/.my.cnf"
+    networks:
+      - name: wpnet
+  loop: "{{ range(1, 6) | list }}"
+  loop_control:
+    label: "galera{{ item }}"
+
+
+- name: Перезапустить несколько контейнеров
+  community.docker.docker_container:
+    name: "{{ item }}"
+    state: started
+    restart: true
+  loop:
+    - grafana
